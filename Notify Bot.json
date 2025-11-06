@@ -1,0 +1,357 @@
+{
+  "name": "Notify Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sekani-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        544,
+        0
+      ],
+      "id": "9ff9fb82-4005-4748-964c-8d261a963dc7",
+      "name": "Incoming Chat Messages",
+      "webhookId": "8aadf8d3-652a-476f-b9ea-bf7d455e25f5"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get user input and session data\nconst userMessage = $input.item.json.body.message;\nconst sessionId = $input.item.json.body.sessionId || 'session_' + Date.now();\nconst userTimezone = $input.item.json.body.timezone || 'Africa/Nairobi';\nconst userLocation = $input.item.json.body.location || 'Kenya';\nconst userEmail = $input.item.json.body.email || '';\n\n// Determine greeting based on time\nconst now = new Date();\nconst options = { timeZone: userTimezone, hour: 'numeric', hour12: false };\nconst hour = parseInt(now.toLocaleString('en-US', options));\n\nlet timeGreeting = '';\nif (hour >= 5 && hour < 12) {\n  timeGreeting = 'Good morning';\n} else if (hour >= 12 && hour < 17) {\n  timeGreeting = 'Good afternoon';\n} else if (hour >= 17 && hour < 21) {\n  timeGreeting = 'Good evening';\n} else {\n  timeGreeting = 'Hello';\n}\n\nreturn {\n  json: {\n    userMessage,\n    sessionId,\n    userTimezone,\n    userLocation,\n    userEmail,\n    timeGreeting,\n    currentHour: hour,\n    timestamp: now.toISOString()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "df211f69-59bf-403a-a132-d6de42890393",
+      "name": "Process User Input"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Since we're not using Redis, create a simple single-message context\n// This will make Sekani respond to each message independently\n// When you add Redis later, this will maintain conversation history\n\nconst userMessage = $input.item.json.userMessage;\n\n// Create a simple conversation array with just the current message\nconst conversationHistory = [\n  {\n    role: 'user',\n    content: userMessage\n  }\n];\n\nreturn {\n  json: {\n    conversationHistory,\n    sessionData: $input.item.json\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        0
+      ],
+      "id": "460b1547-ce6e-4f78-9dcd-51e43ea180fa",
+      "name": "Build Conversation Context"
+    },
+    {
+      "parameters": {
+        "resource": "assistant",
+        "operation": "create",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "GPT-4O"
+        },
+        "name": "Sekani ",
+        "description": "Notify's AI ",
+        "instructions": "You are Sekani, the friendly and professional AI assistant for Notify. Your personality is warm, approachable, and helpful.\n\n**About Notify:**\nNotify is a cutting-edge technology solutions company specializing in AI including:\n- Timetabling Systems for Schools \n-AI- Powered Automation systems\n-Personalized AI for Institutions\n\n**Your Capabilities:**\n1. **General Inquiries**: Answer questions about Notify's services, expertise, and approach\n2. **Scheduling**: Help users schedule calls or consultations by directing them to the \"Get In Touch\" section\n3. **Pricing**: When asked about pricing, inquire which specific service they're interested in, then connect them to a sales representative\n4. **Technical Questions**: Provide information about technologies, methodologies, and solutions\n5. **Redirection**: Smoothly redirect users to appropriate resources or team members\n6:When asking for info (like name or email), explain why it’s needed.\n\n7:Avoid technical jargon unless the user is technical.\n\n8:Use soft transitions like “Sure thing,” “Got it,” “No problem,” “Thanks for confirming,” etc.\n\n**Communication Style:**\n- Start conversations with: {{$('Process User Input').item.json.timeGreeting}}\n- Be conversational and natural, like talking to a friend\n- Use emojis occasionally to add warmth (😊 👋 ✨ 🚀) but not excessively\n- Keep responses concise but informative (2-4 sentences usually)\n- Show genuine interest in helping\n- Be professional but not stiff\n- Use the user's location context when relevant: {{$('Process User Input').item.json.userLocation}}\n-Use the user's name\n\n**Important Guidelines:**\n- NEVER provide specific pricing without connecting to sales team\n- For scheduling: Direct users to the contact form or \"Get In Touch\" section on the website\n- For sales inquiries: Ask which service they're interested in, then offer to connect them to a sales rep\n- Stay on topic about Notify Technologies services\n- If you don't know something, be honest and offer to connect them with someone who can help\n- Remember context from the conversation history\n\n**Handling Specific Scenarios:**\n\n**When someone wants to schedule a call/ or book a meeting:**\n\"I'd be happy to help you schedule a call with our team! 📅 Please visit our 'Get In Touch' section on the website where you can book a convenient time slot. Would you like me to tell you more about what we can discuss?\"\n\nIf user says: “Pricing”\n\nReply: “Pricing depends on your needs — our sales team can give you exact details. Would you like me to connect you to a team member?”\n\nIf user says: “I want to talk to sales”\n\nReply: “Of course! Before I connect you, can I get your name and email so our sales rep can reach you quickly?”\n\nIf user agrees to share info:\n\nReply: “Thank you! We’ll contact you shortly with more details.”\n\nIf team unavailable:\n\nReply: “Our team isn’t available to chat right now, but I can take your info( business email and name) and have someone contact you soon.”\n\n\n\n🔒 Privacy Reminder:\nAlways remind the user once before collecting data:\n“Just to let you know, if you share your info (like name or email), we’ll store it securely to follow up later. You can read our privacy policy.”\n\n**When someone asks about pricing:**\n\"Great question! To provide you with accurate pricing, I'd like to know which service interests you. We offer:\n\n- Timetabling Systems for Schools \n-AI- Powered Automation systems\n-Personalized AI for Institutions\n\nWhich one would you like to know more about? Once you let me know, I can connect you with one of our sales representatives who can provide detailed pricing tailored to your needs.\"\n\n**When someone asks about services:**\nProvide helpful, detailed information about the service, highlighting benefits and capabilities. End with asking if they'd like to discuss their specific needs.\n\n**When someone asks general questions:**\nAnswer naturally and conversationally, staying relevant to Notify and tech solutions.\n\n**Current Context:**\n- Time: {{$('Process User Input').item.json.currentHour}}:00 ({{$('Process User Input').item.json.userTimezone}})\n- Location: {{$('Process User Input').item.json.userLocation}}\n- Greeting: {{$('Process User Input').item.json.timeGreeting}}\n\nRemember: You represent Notify, so always be helpful, professional, and customer-focused! 🌟\n\nEnd the conversation in a friendly manner, be nice, mention the person's name.",
+        "codeInterpreter": true,
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1184,
+        0
+      ],
+      "id": "6676f4ac-41de-4d0c-9742-0a2f204559f8",
+      "name": "Create an assistant",
+      "credentials": {
+        "openAiApi": {
+          "id": "CSSA77dCD5juyb3k",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get AI response and user message\nconst aiResponse = $input.item.json.message.content;\nconst userMessage = $('Process User Input').item.json.userMessage.toLowerCase();\n\n// Intent detection\nlet intent = 'general';\nlet requiresHumanHandoff = false;\n\n// Schedule intent\nif (userMessage.includes('schedule') || \n    userMessage.includes('book') || \n    userMessage.includes('appointment') || \n    userMessage.includes('meeting') ||\n    userMessage.includes('call me') ||\n    userMessage.includes('talk to someone')) {\n  intent = 'schedule';\n  requiresHumanHandoff = false; // Directing to form, not immediate handoff\n}\n\n// Pricing intent - requires sales team\nif (userMessage.includes('price') || \n    userMessage.includes('pricing') || \n    userMessage.includes('cost') || \n    userMessage.includes('quote') ||\n    userMessage.includes('how much') ||\n    userMessage.includes('budget') ||\n    userMessage.includes('rate')) {\n  intent = 'pricing';\n  requiresHumanHandoff = true;\n}\n\n// Sales intent - requires sales team\nif (userMessage.includes('buy') || \n    userMessage.includes('purchase') || \n    userMessage.includes('interested in') || \n    userMessage.includes('want to hire') ||\n    userMessage.includes('need a') ||\n    userMessage.includes('looking for') ||\n    userMessage.includes('sales')) {\n  intent = 'sales';\n  requiresHumanHandoff = true;\n}\n\n// Support intent\nif (userMessage.includes('help') || \n    userMessage.includes('support') || \n    userMessage.includes('issue') || \n    userMessage.includes('problem')) {\n  intent = 'support';\n}\n\n// Contact intent\nif (userMessage.includes('contact') || \n    userMessage.includes('reach out') || \n    userMessage.includes('get in touch') ||\n    userMessage.includes('speak with')) {\n  intent = 'contact';\n  requiresHumanHandoff = true;\n}\n\nreturn {\n  json: {\n    aiResponse,\n    intent,\n    requiresHumanHandoff,\n    userMessage: $('Process User Input').item.json.userMessage,\n    userEmail: $('Process User Input').item.json.userEmail,\n    sessionData: $('Process User Input').item.json\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        0
+      ],
+      "id": "dc865312-c35f-45aa-a9b9-ffd0b8122c94",
+      "name": "Analyze Intent"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "36bd5a08-2bf7-4e4c-8444-fed4da935804",
+              "leftValue": "=={{$json.requiresHumanHandoff}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1632,
+        0
+      ],
+      "id": "e4b01b44-0c95-4c8d-9fdf-f01f3cb6dfd3",
+      "name": "Check if Human Handoff"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3b869bbd-bde4-4677-8286-118edc0cec5d",
+              "name": "notificationType",
+              "value": "sales_inquiry",
+              "type": "string"
+            },
+            {
+              "id": "ef7233e9-689d-4aa7-a71a-41441f64e45d",
+              "name": "userEmail",
+              "value": "={{$json.userEmail || 'Not provided'}}",
+              "type": "string"
+            },
+            {
+              "id": "a942c101-f7dd-42a8-8ba0-bdeac583f068",
+              "name": "userMessage",
+              "value": "={{$json.userMessage}}",
+              "type": "string"
+            },
+            {
+              "id": "746a54e8-7ed8-4b5f-b582-a491518c2153",
+              "name": "intent",
+              "value": "={{$json.intent}}",
+              "type": "string"
+            },
+            {
+              "id": "59ecddf5-c8eb-4085-9be4-8cd197430534",
+              "name": "timestamp",
+              "value": "={{$json.sessionData.timestamp}}",
+              "type": "string"
+            },
+            {
+              "id": "e7629d0e-18d0-4cb8-b6cf-405f142021f9",
+              "name": "location",
+              "value": "={{$json.sessionData.userLocation}}",
+              "type": "string"
+            },
+            {
+              "id": "ec3991e4-35b1-415e-8363-a9ad0cc8cd02",
+              "name": "sessionId",
+              "value": "={{$json.sessionData.sessionId}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1824,
+        -176
+      ],
+      "id": "01d7d86c-7067-4f7a-b185-bbf910146891",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "sendTo": "notifytechgroup@gmail.com",
+        "subject": "=🔔 New Sales Inquiry - {{$json.intent}}",
+        "message": "=<html> <head>   <style>     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }     .container { max-width: 600px; margin: 0 auto; padding: 20px; }     .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; }     .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }     .info-row { margin: 15px 0; padding: 10px; background: white; border-radius: 5px; }     .label { font-weight: bold; color: #667eea; }     .message-box { background: white; padding: 15px; border-left: 4px solid #667eea; margin: 15px 0; }     .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }   </style> </head> <body>   <div class=\"container\">     <div class=\"header\">       <h2 style=\"margin: 0;\">🔔 New Lead from Sekani</h2>       <p style=\"margin: 5px 0 0 0; opacity: 0.9;\">AI Chatbot Alert</p>     </div>     <div class=\"content\">       <div class=\"info-row\">         <span class=\"label\">Intent Type:</span>          <span style=\"text-transform: capitalize; background: #667eea; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px;\">{{$json.intent}}</span>       </div>              <div class=\"info-row\">         <span class=\"label\">User Email:</span> {{$json.userEmail}}       </div>              <div class=\"info-row\">         <span class=\"label\">Location:</span> {{$json.location}}       </div>              <div class=\"info-row\">         <span class=\"label\">Session ID:</span> {{$json.sessionId}}       </div>              <div class=\"info-row\">         <span class=\"label\">Timestamp:</span> {{$json.timestamp}}       </div>              <div class=\"message-box\">         <p class=\"label\">User's Message:</p>         <p>{{$json.userMessage}}</p>       </div>              <div style=\"background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin-top: 20px;\">         <p style=\"margin: 0; color: #856404;\"><strong>⚡ Action Required:</strong> Please follow up with this lead as soon as possible!</p>       </div>              <div class=\"footer\">         <p>This is an automated notification from Sekani, the Notify Technologies AI Assistant.</p>         <p>Respond promptly to maintain high customer satisfaction! 🚀</p>       </div>     </div>   </div> </body> </html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2000,
+        -176
+      ],
+      "id": "d450c0fc-2481-4d8e-8fdf-9a62f8c65c02",
+      "name": "Send a message",
+      "webhookId": "153590b0-3ee6-46a4-9345-4fecc3ccf0a6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ehyE1LokhGa6SC2J",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get conversation history from earlier node\nconst conversationHistory = $('Build Conversation Context').item.json.conversationHistory;\n\n// Get AI response\nconst aiResponse = $('Analyze Intent').item.json.aiResponse;\n\n// Add AI response to history\nconversationHistory.push({\n  role: 'assistant',\n  content: aiResponse\n});\n\n// Limit to last 20 messages (10 exchanges) to avoid token limits\nif (conversationHistory.length > 20) {\n  conversationHistory.splice(0, conversationHistory.length - 20);\n}\n\nreturn {\n  json: {\n    conversationHistory,\n    sessionId: $('Process User Input').item.json.sessionId\n  }\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2128,
+        144
+      ],
+      "id": "2e5b070f-62ec-4181-855a-55494725b5da",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n    \"response\": $('Analyze Intent').item.json.aiResponse,\n    \"sessionId\": $('Process User Input').item.json.sessionId,\n    \"intent\": $('Analyze Intent').item.json.intent,\n    \"humanHandoffRequired\": $('Analyze Intent').item.json.requiresHumanHandoff,\n    \"timestamp\": $('Process User Input').item.json.timestamp\n  }\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2352,
+        144
+      ],
+      "id": "f7bdf2f1-4be6-4ee7-9260-f1090901bf52",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Incoming Chat Messages": {
+      "main": [
+        [
+          {
+            "node": "Process User Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process User Input": {
+      "main": [
+        [
+          {
+            "node": "Build Conversation Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Conversation Context": {
+      "main": [
+        [
+          {
+            "node": "Create an assistant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an assistant": {
+      "main": [
+        [
+          {
+            "node": "Analyze Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Intent": {
+      "main": [
+        [
+          {
+            "node": "Check if Human Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Human Handoff": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3658da4e-41f7-4ac5-ad03-12cd4749f608",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b94fe4facea61c11b789ab3e9ae42502f077268c7e4952a84961d78ac1c95355"
+  },
+  "id": "X5wAzwQLNDVFNbNI",
+  "tags": []
+}
